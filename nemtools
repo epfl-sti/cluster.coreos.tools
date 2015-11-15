@@ -1,0 +1,136 @@
+#!/bin/sh
+
+# Some bash tools to make your life easier :)
+# Concept:
+#	  1. ping all cluster to get alive hosts
+#	     and write file pingable_members
+#	  2. function askSsh "arg" will connect though
+#	     ssh to hosts in pingable_members and run the
+# 	     arg command
+# for HOST in $(cat pingable_members) ; do ssh $HOST "uname -a" ; done
+
+# Global var
+hashpad=$(printf '%0.1s' "#"{1..72})
+padlength=72
+
+# pagGen function will echo a line of 72 chars
+padGen() {
+    if [ -z "$1" ]; then
+        echo "Input string can not be null"
+        exit
+    fi
+    if [ ${#1} -ne 1 ] ; then
+	echo "only one char should be passed"
+    fi 
+    pad=$(printf '%0.1s' "$1"{1..72})
+    if [ $2 ]; then
+	echo $pad;
+    fi
+}
+
+# privEcho fonction will padd a char between two texts
+# i.e. c02 ................................... pinging
+privEcho() {
+    if [ "$#" -ne 2 ]; then
+        echo "Illegal number of parameters"
+	exit       
+    fi
+    if [ -z "$1" ] || [ -z "$2" ]; then
+	echo "Input string can not be null"
+	exit
+    fi
+    
+    pagGen "#";
+    string1="$1 ";
+    string2=" $2";
+    printf '%s%*.*s%s\n' "$string1" 0 $((padlength - ${#string1} - ${#string2} )) "$pad" "$string2"
+}
+
+# test function
+test() {
+    echo "test";
+    privEcho 'mon input' 'test'
+    for i in `seq -w 01 10`;
+    do
+        echo $i
+        #ssh -n c$i "uname -a"
+    done
+}
+
+# fleetcheck will create a report on cluster's health
+# using fleetctl
+fleetcheck() {
+  fleetctl list-machines | sort -n -t . -k 7,7
+  TOTAL=$(fleetctl list-machines -no-legend | wc -l)
+  echo -e "\n         Congratulations officer, your fleet have $TOTAL members !\n"
+  echo -e "* etcd members are:\n"
+  etcdctl member list | sort -t = -k2
+  echo -e "\n* and cluster's health:\n"
+  etcdctl cluster-health
+}
+
+# pingCluster ping all host in a seq and will write a file
+# `pingable_members` with all alive hosts
+pingCluster() {
+    local cMembers=()
+    local endNum=80
+    padGen "#" true
+    for i in `seq -w 01 $endNum`;
+    do
+	string1="# c$i "
+	string2=" is pinging #"
+	padGen ".";
+	ping -c 1 -q c$i 2>&1 | grep -q "1 received" && printf '%s%*.*s%s\n' "$string1" 0 $((padlength - ${#string1} - ${#string2} )) "$pad" "$string2" && cMembers+=("c$i")
+    done
+    padGen "#" true
+    echo -e "Pingable members list:";
+    echo ${cMembers[@]};
+    echo ${cMembers[@]} > pingable_members;
+    echo "These ${#cMembers[@]} members are now written in pingable_members file"
+}
+
+function askSsh() {
+    echo "Command is: $2"
+    # todo check pingable_members
+    for HOST in $(cat pingable_members) ; do ssh $HOST "$2" ; done
+}
+
+function uname() {
+    for HOST in $(cat pingable_members) ; do ssh $HOST "uname -a" ; done
+}
+
+while [ -n "$1" ]; do case "$1" in
+    test)
+        test
+        shift ;;
+
+    # Production verbs
+    fleetcheck)
+        fleetcheck
+        shift ;;
+    ping)
+	pingCluster
+	shift ;;
+    ssh)
+	askSsh $2
+	shift ;;
+    uname)
+	uname
+	shift ;;
+    *)
+        set +x
+        echo >&2 "Unknown verb: $1"
+        exit 2
+        ;;
+esac; done
+
+if [ -z "$1" ] || [ -z "$2" ]; then
+   echo -e "Usage:"
+   echo -e " - nemtools fleetcheck"
+   echo -e " - nemtools ping"
+   echo -e " - nemtools uname"
+   exit
+fi
+
+
+exit 0
