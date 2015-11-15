@@ -99,6 +99,15 @@ function uname() {
     for HOST in $(cat pingable_members) ; do ssh $HOST "uname -a" ; done
 }
 
+function updateToolbox() {
+   for HOST in $(cat pingable_members) ; do ssh $HOST "docker pull epflsti/cluster.coreos.toolbox"; done
+}
+
+function ipmiprint() {
+    # docker run --privileged -ti epflsti/cluster.coreos.toolbox ipmitool lan print
+    for HOST in $(cat pingable_members) ; do ssh $HOST "docker run --privileged -t epflsti/cluster.coreos.toolbox ipmitool lan print"; done
+}
+
 while [ -n "$1" ]; do case "$1" in
     test)
         test
@@ -107,6 +116,9 @@ while [ -n "$1" ]; do case "$1" in
     # Production verbs
     fleetcheck)
         fleetcheck
+        shift ;;
+    ipmiprint)
+        ipmiprint
         shift ;;
     ping)
 	pingCluster
@@ -117,6 +129,9 @@ while [ -n "$1" ]; do case "$1" in
     uname)
 	uname
 	shift ;;
+    updateToolbox)
+	updateToolbox
+	shift ;;
     *)
         set +x
         echo >&2 "Unknown verb: $1"
@@ -124,11 +139,16 @@ while [ -n "$1" ]; do case "$1" in
         ;;
 esac; done
 
-if [ -z "$1" ] || [ -z "$2" ]; then
-   echo -e "Usage:"
-   echo -e " - nemtools fleetcheck"
-   echo -e " - nemtools ping"
-   echo -e " - nemtools uname"
+if [ -z "$1" ]; then
+   echo -e ""
+   padGen "-" 1
+   echo -e "Usage:                                              (alphabetical order)"
+   echo -e " - ./nemtools fleetcheck"
+   echo -e " - ./nemtools ipmiprint"
+   echo -e " - ./nemtools ping"
+   echo -e " - ./nemtools uname"
+   echo -e " - ./nemtools updateToolbox"
+   padGen "-" 1
    exit
 fi
 
