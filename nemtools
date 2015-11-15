@@ -89,6 +89,11 @@ pingCluster() {
     echo "These ${#cMembers[@]} members are now written in pingable_members file"
 }
 
+function getIPs() {
+    # ip a show ethbr4 |grep inet|head -1| awk '{ print $2 }'|cut -d '/' -f 1
+    for HOST in $(cat pingable_members); do ssh $HOST "hostname -f && ip a show ethbr4 | grep inet | head -1 | awk '{ print $2 }' | cut -d '/' -f 1"; done
+}
+
 function askSsh() {
     echo "Command is: $2"
     # todo check pingable_members
@@ -117,6 +122,9 @@ while [ -n "$1" ]; do case "$1" in
     fleetcheck)
         fleetcheck
         shift ;;
+    ip)
+	getIPs
+	shift ;;
     ipmiprint)
         ipmiprint
         shift ;;
