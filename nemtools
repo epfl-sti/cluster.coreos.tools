@@ -13,7 +13,7 @@
 hashpad=$(printf '%0.1s' "#"{1..72})
 padlength=72
 
-# pagGen function will echo a line of 72 chars
+# padGen function will echo a line of 72 chars
 padGen() {
     if [ -z "$1" ]; then
         echo "Input string can not be null"
@@ -40,7 +40,7 @@ privEcho() {
 	exit
     fi
     
-    pagGen "#";
+    padGen "#";
     string1="$1 ";
     string2=" $2";
     printf '%s%*.*s%s\n' "$string1" 0 $((padlength - ${#string1} - ${#string2} )) "$pad" "$string2"
@@ -90,8 +90,20 @@ pingCluster() {
 }
 
 function getIPs() {
-    # ip a show ethbr4 |grep inet|head -1| awk '{ print $2 }'|cut -d '/' -f 1
-    for HOST in $(cat pingable_members); do ssh $HOST "hostname -f && ip a show ethbr4 | grep inet | head -1 | awk '{ print $2 }' | cut -d '/' -f 1"; done
+    # ip a show ethbr4 |grep inet|head -1| awk '{ print $2 }'|cut -d '/' -f 1 
+    for HOST in $(cat pingable_members); do 
+	privEcho "$HOST" "#"
+	ssh -T $HOST <<SSHOST
+	    echo 'ethbr4:';
+	    ip a show ethbr4 | grep inet | head -1 | awk '{ print $2 }' | cut -d '/' -f 1;
+	    echo 'enp4s0f1:';
+	    ip a show enp4s0f1 | grep inet | head -1 | awk '{ print $2 }' | cut -d '/' -f 1; 
+	    echo 'enp1s0f1:';
+	    ip a show enp1s0f1 | grep inet | head -1 | awk '{ print $2 }' | cut -d '/' -f 1;
+	    echo 'IPMI IP:';
+	    docker run --privileged -t epflsti/cluster.coreos.toolbox ipmitool lan print | grep "IP Address              :"| awk '{ print $4 }';
+SSHOST
+    done
 }
 
 function askSsh() {
@@ -110,7 +122,10 @@ function updateToolbox() {
 
 function ipmiprint() {
     # docker run --privileged -ti epflsti/cluster.coreos.toolbox ipmitool lan print
-    for HOST in $(cat pingable_members) ; do ssh $HOST "docker run --privileged -t epflsti/cluster.coreos.toolbox ipmitool lan print"; done
+    for HOST in $(cat pingable_members) ; do 
+	padGen "-" 1;
+	ssh $HOST "hostname -f && docker run --privileged -t epflsti/cluster.coreos.toolbox ipmitool lan print"; 
+    done
 }
 
 while [ -n "$1" ]; do case "$1" in
@@ -152,6 +167,7 @@ if [ -z "$1" ]; then
    padGen "-" 1
    echo -e "Usage:                                              (alphabetical order)"
    echo -e " - ./nemtools fleetcheck"
+   echo -e " - ./nemtools ip"
    echo -e " - ./nemtools ipmiprint"
    echo -e " - ./nemtools ping"
    echo -e " - ./nemtools uname"
